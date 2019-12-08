@@ -35,8 +35,9 @@ class BlackBox():
     def create_blocks(self):
         'Initializes blocks by increaments of 5.'
         blocks = []
-        for i in range(1, 129):
-            blocks.append(list(range((i-1)*5, i*5)))
+        for i in range(0, 128):
+            blocks.append(list(range(i*5, (i+1)*5)))
+
         return blocks
 
 
