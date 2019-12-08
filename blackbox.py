@@ -15,27 +15,38 @@ class BlackBox():
         self.np_matrix = self.PIL2array(self.shredded_image)
 
     def PIL2array(self, img):
+        'Converts PIL img to numpy array.'
         return np.array(img.getdata(),
                         np.uint8).reshape(img.size[1], img.size[0], 1)
 
-    def array2PIL(self, arr, size):
+    def array2PIL(self, array, size):
+        'Converts numpy array to PIL img.'
         mode = 'L'
-        arr = arr.reshape(arr.shape[0]*arr.shape[1], arr.shape[2])
-        if len(arr[0]) == 3:
-            arr = np.c_[arr, 255*np.ones((len(arr), 1), np.uint8)]
-        return Image.frombuffer(mode, size, arr.tostring(), 'raw', mode, 0, 1)
+        dim = array.shape
+        array = array.reshape(dim[0] * dim[1], dim[2])
+
+        if len(array[0]) == 3:
+            # Concatenation along the second axis ie. [[a[0], 255], [a[1], 255], ...].
+            array = np.c_[array, 255 * np.ones((len(array), 1), np.uint8)]
+        
+        return Image.frombuffer(mode, size, array.tostring(), 'raw', mode, 0, 1)
+
 
     def create_blocks(self):
+        'Initializes blocks by increaments of 5.'
         blocks = []
         for i in range(1, 129):
             blocks.append(list(range((i-1)*5, i*5)))
         return blocks
 
+
     def swap(self, indexes, matrix):
         permutation = []
         for i in indexes:
             permutation.extend(self.blocks[i])
+        
         return matrix[:, permutation]
+
 
     def evaluate_solution(self, permutation):
         if len(permutation) != len(self.blocks):
@@ -44,6 +55,7 @@ class BlackBox():
 
         np_matrix = self.swap(permutation, self.np_matrix)
         return np.sum(np.abs(np_matrix-self.origin_matrix))
+
 
     def show_solution(self, permutation, record=None):
         if not isinstance(permutation, list):
