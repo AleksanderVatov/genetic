@@ -1,92 +1,57 @@
-from deap import base, creator, tools
+from deap import algorithms, base, creator, tools
 
 import blackbox
 import random
+import numpy as np
+import matplotlib.pyplot as plt
+import operator
 
-N_SLICES = 128
-
+# Call premade oracle
 oracle = blackbox.BlackBox('shredded.png', 'original.png')
+toolbox = base.Toolbox()
 
-class Strategy(object):
-    'Strategy to find the correct permutation.'
-    def __init__(self):
-        pass
+def evaluation(individual):
+    return (oracle.evaluate_solution(individual),)
 
-    def random(self):
-        order = list(range(N_SLICES))
-        random.shuffle(order)
-        return order
-    
-    def identity(self):
-        return list(range(N_SLICES))
 
-def deap_tutorial(test: str) -> None:
-    # Type creation / TensorFlow-like
-    creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-    creator.create("Individual", list, fitness=creator.FitnessMin)
+# Create fitness attribute to be minimized and assign it to the individual.
+creator.create("FitnessMin", base.Fitness, weights=((-1.),))
+creator.create("Individual", list, fitness=creator.FitnessMin)
 
-    # Initialization of your variables
-    IND_SIZE = 10
+toolbox.register("indices", np.random.permutation, 128)
+toolbox.register("individual", tools.initIterate, creator.Individual,
+                 toolbox.indices)
+toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-    toolbox = base.Toolbox()
-    toolbox.register("attribute", random.random)
-    toolbox.register("individual", tools.initRepeat, creator.Individual,
-                    toolbox.attribute, n=IND_SIZE)
-    toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+toolbox.register("mate", tools.cxOrdered)
+toolbox.register("mutate", tools.mutShuffleIndexes, indpb=5e-3)
 
-    # The fun part
-    def evaluate(individual):
-        return sum(individual)
+toolbox.register("evaluate", evaluation)
+toolbox.register("select", tools.selTournament, tournsize=3)
 
-    toolbox.register("mate", tools.cxTwoPoint)
-    toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=1, indpb=0.1)
-    toolbox.register("select", tools.selTournament, tournsize=3)
-    toolbox.register("evaluate", evaluate)
+pop = toolbox.population(n=100)
 
-    # Algorithm
-    def main():
-        pop = toolbox.population(n=50)
-        CXPB, MUTPB, NGEN = 0.5, 0.2, 40
+fit_stats = tools.Statistics(key=operator.attrgetter("fitness.values"))
+stats.register("avg", np.mean)
+stats.register("std", np.std)
+stats.register("min", np.min)
+stats.register("max", np.max)
 
-        # Evaluate the entire population
-        fitnesses = map(toolbox.evaluate, pop)
-        for ind, fit in zip(pop, fitnesses):
-            ind.fitness.values = fit
+result, log = algorithms.eaSimple(pop, toolbox,
+                                cxpb=.9, mutpb=1,
+                                ngen=500, stats=stats, verbose=False)
 
-        for g in range(NGEN):
-            # Select the next generation individuals
-            offspring = toolbox.select(pop, len(pop))
-            # Clone the selected individuals
-            offspring = map(toolbox.clone, offspring)
+best_individual = tools.selBest(result, k=1)[0]
+print('Fitness of the best individual: ', evaluation(best_individual)[0])
 
-            # Apply crossover and mutation on the offspring
-            for child1, child2 in zip(offspring[::2], offspring[1::2]):
-                if random.random() < CXPB:
-                    toolbox.mate(child1, child2)
-                    del child1.fitness.values
-                    del child2.fitness.values
+plt.figure(figsize=(11, 4))
+plots = plt.plot(log.select('min'), 'c-', log.select('avg'), 'b-')
+plt.legend(plots, ('Minimum fitness', 'Mean fitness'), frameon=True)
+plt.ylabel('Fitness')
+plt.xlabel('Iterations')
 
-            for mutant in offspring:
-                if random.random() < MUTPB:
-                    toolbox.mutate(mutant)
-                    del mutant.fitness.values
+plt.show()
 
-            # Evaluate the individuals with an invalid fitness
-            invalid_ind = [ind for ind in offspring if not ind.fitness.valid]
-            fitnesses = map(toolbox.evaluate, invalid_ind)
-            for ind, fit in zip(invalid_ind, fitnesses):
-                ind.fitness.values = fit
 
-            # The population is entirely replaced by the offspring
-            pop[:] = offspring
-
-        return pop
-
-if __name__ == '__main__':
-    strat = Strategy()
-    order = strat.random()
-
-    # Print the solution's fitness
-    print(oracle.evaluate_solution(order))
-    # Display the solution
-    oracle.show_solution(order)
+# Display the solution
+# oracle.show_solution(order)
